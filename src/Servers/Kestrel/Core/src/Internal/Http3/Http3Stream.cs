@@ -43,6 +43,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
         private Http3StreamContext _context = default!;
         private IProtocolErrorCodeFeature _errorCodeFeature = default!;
         private IStreamIdFeature _streamIdFeature = default!;
+        private IStreamAbortFeature _streamAbortFeature = default!;
         private int _isClosed;
         private readonly Http3RawFrame _incomingFrame = new Http3RawFrame();
         protected RequestHeaderParsingState _requestHeaderParsingState;
@@ -87,6 +88,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
 
             _errorCodeFeature = _context.ConnectionFeatures.Get<IProtocolErrorCodeFeature>()!;
             _streamIdFeature = _context.ConnectionFeatures.Get<IStreamIdFeature>()!;
+			_streamAbortFeature = _context.ConnectionFeatures.Get<IStreamAbortFeature>()!;
 
             _appCompleted = null;
             _isClosed = 0;
@@ -378,10 +380,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
                     // the request stream, send a complete response, and cleanly close the sending part of the stream.
                     // The error code H3_NO_ERROR SHOULD be used when requesting that the client stop sending on the
                     // request stream.
-
-                    // TODO(JamesNK): Abort the read half of the stream with H3_NO_ERROR
-                    // https://github.com/dotnet/aspnetcore/issues/33575
-
+                    _errorCodeFeature.Error = (long)Http3ErrorCode.NoError;
+                    _streamAbortFeature.AbortRead(new ConnectionAbortedException("The application completed without reading the entire request body."));
                     RequestBodyPipe.Writer.Complete();
                 }
 
