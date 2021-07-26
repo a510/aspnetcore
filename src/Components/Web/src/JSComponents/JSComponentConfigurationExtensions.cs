@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.Web.Infrastructure;
 using static Microsoft.AspNetCore.Internal.LinkerFlags;
 
-namespace Microsoft.AspNetCore.Builder
+namespace Microsoft.AspNetCore.Components.Web
 {
     /// <summary>
     /// Extension methods for working on an <see cref="IJSComponentConfiguration"/>.
