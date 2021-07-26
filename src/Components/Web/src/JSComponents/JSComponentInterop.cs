@@ -10,6 +10,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Components.HotReload;
 using Microsoft.AspNetCore.Components.Reflection;
 using Microsoft.AspNetCore.Components.RenderTree;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
 
@@ -116,13 +117,28 @@ namespace Microsoft.AspNetCore.Components.Web.Infrastructure
             {
                 var parameterName = parametersReader.GetString()!;
                 object? parameterValue;
-                if (TryGetComponentParameterType(componentType, parameterName, out var parameterType))
+                if (TryGetComponentParameterType(componentType, parameterName, out var parameterTypeInfo))
                 {
                     // It's a statically-declared parameter, so we can parse it into a known .NET type
-                    parameterValue = JsonSerializer.Deserialize(
-                        ref parametersReader,
-                        parameterType,
-                        _jsonOptions);
+                    parametersReader.Read();
+                    if (parametersReader.TokenType == JsonTokenType.String
+                        && parameterTypeInfo.Constraint is UrlValueConstraint constraint)
+                    {
+                        // We try to coerce incoming strings into the target type using the same culture-invariant
+                        // parsers and rules as we do for URL values. This makes it much easier to implement the
+                        // JS code for custom elements, because you can always supply a string and don't need to
+                        // parse attribute strings back into types like numbers or bools.
+                        var stringValue = parametersReader.GetString();
+                        parameterValue = constraint.Parse(stringValue, parameterName);
+                    }
+                    else
+                    {
+                        // It's a non-string value or a non-coercible destination, so use regular JSON parsing.
+                        parameterValue = JsonSerializer.Deserialize(
+                            ref parametersReader,
+                            parameterTypeInfo.Type,
+                            _jsonOptions);
+                    }
                 }
                 else
                 {
@@ -175,7 +191,7 @@ namespace Microsoft.AspNetCore.Components.Web.Infrastructure
         internal static ParameterTypeCache GetComponentParameters(Type componentType)
             => ParameterTypeCaches.GetOrAdd(componentType, static type => new ParameterTypeCache(type));
 
-        private static bool TryGetComponentParameterType(Type componentType, string parameterName, out Type parameterType)
+        private static bool TryGetComponentParameterType(Type componentType, string parameterName, out ParameterTypeInfo parameterType)
         {
             var cacheForComponent = GetComponentParameters(componentType);
             return cacheForComponent.ParameterTypes.TryGetValue(parameterName, out parameterType!);
@@ -183,7 +199,7 @@ namespace Microsoft.AspNetCore.Components.Web.Infrastructure
 
         internal readonly struct ParameterTypeCache
         {
-            public readonly Dictionary<string, Type> ParameterTypes;
+            public readonly Dictionary<string, ParameterTypeInfo> ParameterTypes;
 
             public ParameterTypeCache(Type componentType)
             {
@@ -193,9 +209,23 @@ namespace Microsoft.AspNetCore.Components.Web.Infrastructure
                 {
                     if (propertyInfo.IsDefined(typeof(ParameterAttribute)))
                     {
-                        ParameterTypes.Add(propertyInfo.Name, propertyInfo.PropertyType);
+                        ParameterTypes.Add(propertyInfo.Name, new ParameterTypeInfo(propertyInfo.PropertyType));
                     }
                 }
+            }
+        }
+
+        internal readonly struct ParameterTypeInfo
+        {
+            public readonly Type Type;
+            public readonly UrlValueConstraint? Constraint;
+
+            public ParameterTypeInfo(Type type)
+            {
+                Type = type;
+                Constraint = UrlValueConstraint.TryGetByTargetType(type, out var constraint)
+                    ? constraint
+                    : null;
             }
         }
     }
