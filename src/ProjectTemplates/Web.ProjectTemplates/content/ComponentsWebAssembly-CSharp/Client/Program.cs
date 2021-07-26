@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components.Web;
 #if (!NoAuth && Hosted)
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;

@@ -65,14 +65,21 @@ class DynamicRootComponent {
 }
 
 // Called by the framework
-export function setDynamicRootComponentManager(instance: DotNet.DotNetObject) {
+export function enableJSRootComponents(managerInstance: DotNet.DotNetObject, customElementConfig: CustomElementConfiguration) {
     if (manager) {
         // This will only happen in very nonstandard cases where someone has multiple hosts.
         // It's up to the developer to ensure that only one of them enables dynamic root components.
         throw new Error('Dynamic root components have already been enabled.');
     }
 
-    manager = instance;
+    manager = managerInstance;
+
+    for (const [initializerIdentifier, customElements] of Object.entries(customElementConfig)) {
+        const initializerFunc = DotNet.jsCallDispatcher.findJSFunction(initializerIdentifier, 0);
+        customElements.forEach(customElement => {
+            initializerFunc(customElement.name, customElement.parameters.map(parameter => ({ name: parameter })));
+        });
+    }
 }
 
 function getRequiredManager(): DotNet.DotNetObject {
@@ -81,4 +88,11 @@ function getRequiredManager(): DotNet.DotNetObject {
     }
 
     return manager;
+}
+
+// Keep in sync with equivalent in JSComponentConfigurationStore.cs
+export type CustomElementConfiguration = { [jsInitializer: string]: CustomElement[] };
+interface CustomElement {
+    name: string;
+    parameters: string[];
 }
