@@ -88,6 +88,27 @@ namespace Microsoft.AspNetCore.Components.E2ETest.ServerExecutionTests
             Browser.Equal("block", () => errorUiElem.GetCssValue("display"));
         }
 
+        [Fact]
+        public void ErrorIfClientAttemptsWebSocketsWithServerOnLongPolling()
+        {
+            Navigate("/subdirLongPolling/Transports");
+
+            Browser.Exists(By.Id("startBlazorServerBtn")).Click();
+
+            var javascript = (IJavaScriptExecutor)Browser;
+            Browser.True(() => (bool)javascript.ExecuteScript("return window['__aspnetcore__testing__blazor__start__script__executed__'] === true;"));
+
+            AssertLogContainsMessages(
+                "Starting up Blazor server-side application.",
+                "Unable to connect to the server with any of the available transports. LongPolling failed: Error: 'LongPolling' is disabled by the client.",
+                "Unable to initiate a SignalR connection to the server. This might be because the server is not configured to support WebSockets. To troubleshoot this, visit");
+
+            var errorUiElem = Browser.Exists(By.Id("blazor-error-ui"), TimeSpan.FromSeconds(10));
+            Assert.NotNull(errorUiElem);
+            Assert.Contains("An unhandled exception has occurred. See browser dev tools for details.", errorUiElem.GetAttribute("innerHTML"));
+            Browser.Equal("block", () => errorUiElem.GetCssValue("display"));
+        }
+
         void AssertLogContainsMessages(params string[] messages)
         {
             var log = Browser.Manage().Logs.GetLog(LogType.Browser);

@@ -72,6 +72,33 @@ namespace TestServer
                     endpoints.MapFallbackToPage("/_ServerHost");
                 });
             });
+
+            // Mount the server-side Blazor app on /subdir
+            app.Map("/subdirLongPolling", app =>
+            {
+                app.Use((context, next) =>
+                {
+                    if (context.Request.Path.Value.EndsWith("/images/blazor_logo_1000x.png", StringComparison.Ordinal))
+                    {
+                        resourceRequestLog.AddRequest(context.Request);
+                    }
+
+                    return next(context);
+                });
+
+                app.UseStaticFiles();
+
+                app.UseRouting();
+                app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapBlazorHub(configureOptions: options =>
+                    {
+                        options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.LongPolling;
+                    });
+                    endpoints.MapControllerRoute("mvc", "{controller}/{action}");
+                    endpoints.MapFallbackToPage("/_ServerHost");
+                });
+            });
         }
     }
 }
