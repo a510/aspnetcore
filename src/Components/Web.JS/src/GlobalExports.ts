@@ -10,9 +10,9 @@ import { CircuitStartOptions } from './Platform/Circuits/CircuitStartOptions';
 import { WebAssemblyStartOptions } from './Platform/WebAssemblyStartOptions';
 import { Platform, Pointer, System_String, System_Array, System_Object, System_Boolean, System_Byte, System_Int } from './Platform/Platform';
 import { getNextChunk } from './StreamingInterop';
-import { RootComponentsFunctions, enableJSRootComponents, CustomElementConfigByInitializer } from './Rendering/JSRootComponents';
+import { RootComponentsFunctions, enableJSRootComponents, CustomElementConfigByInitializer, RegisterCustomElementCallback } from './Rendering/JSRootComponents';
 import { DotNet } from '@microsoft/dotnet-js-interop';
-import { CustomElement, defaultRegisterCustomElement, RegisterCustomElementCallback } from './Rendering/CustomElement';
+import { CustomElement, defaultRegisterCustomElement } from './Rendering/CustomElement';
 
 interface IBlazor {
   navigateTo: (uri: string, options: NavigationOptions) => void;

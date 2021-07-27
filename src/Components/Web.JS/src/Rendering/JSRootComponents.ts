@@ -1,5 +1,4 @@
 import { DotNet } from '@microsoft/dotnet-js-interop';
-import { RegisterCustomElementCallback } from './CustomElement';
 
 const pendingRootComponentContainerNamePrefix = '__bl-dynamic-root:';
 const pendingRootComponentContainers = new Map<string, Element>();
@@ -101,4 +100,13 @@ export type CustomElementConfigByInitializer = { [jsInitializer: string]: Custom
 interface CustomElementConfig {
     name: string;
     parameters: string[];
+}
+
+// The following is public API. It defines the signature of a custom element initializer callback
+export interface RegisterCustomElementCallback {
+    (name: string, parameters: CustomElementParameterInfo[]): void;
+}
+
+export interface CustomElementParameterInfo {
+    name: string;
 }

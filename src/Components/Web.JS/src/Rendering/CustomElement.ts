@@ -1,14 +1,5 @@
-import { RootComponentsFunctions } from './JSRootComponents';
-
-// Defines the signature of a custom element initializer callback. The built-in default initializer
-// uses the built-in CustomElement class.
-export interface RegisterCustomElementCallback {
-    (name: string, parameters: CustomElementParameterInfo[]): void;
-}
-
-interface CustomElementParameterInfo {
-    name: string;
-}
+import { CustomElementParameterInfo } from './JSRootComponents';
+import { Blazor } from '../GlobalExports';
 
 export function defaultRegisterCustomElement(elementName: string, parameters: CustomElementParameterInfo[]): void {
     // Default logic for registering a custom element is just to use the Blazor.CustomElement class
@@ -53,9 +44,7 @@ export class CustomElement extends HTMLElement {
         // values will be populated from the initial attributes before we send them to .NET
         this._addRootComponentPromise = Promise.resolve().then(() => {
             this._hasPendingSetParameters = false;
-
-            // This is the same as calling Blazor.rootComponents.add(...)
-            return RootComponentsFunctions.add(this.renderIntoElement, this.localName, this._parameterValues);
+            return Blazor.rootComponents.add(this.renderIntoElement, this.localName, this._parameterValues);
         });
 
         // Also allow assignment of parameters via properties. This is the only way to set complex-typed values.
