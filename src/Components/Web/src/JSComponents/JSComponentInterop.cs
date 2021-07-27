@@ -121,23 +121,27 @@ namespace Microsoft.AspNetCore.Components.Web.Infrastructure
                 {
                     // It's a statically-declared parameter, so we can parse it into a known .NET type
                     parametersReader.Read();
-                    if (parametersReader.TokenType == JsonTokenType.String
-                        && parameterTypeInfo.Constraint is UrlValueConstraint constraint)
+
+                    if (parametersReader.TokenType == JsonTokenType.String)
                     {
-                        // We try to coerce incoming strings into the target type using the same culture-invariant
-                        // parsers and rules as we do for URL values. This makes it much easier to implement the
-                        // JS code for custom elements, because you can always supply a string and don't need to
+                        // If you give us a string, then as long as the target type is primitive, we'll coerce it using
+                        // the same parsers and rules as we do for URL values. This makes it much easier to implement the
+                        // JS-side code for custom elements, because you can always supply a string and don't need to
                         // parse attribute strings back into types like numbers or bools.
-                        var stringValue = parametersReader.GetString();
-                        parameterValue = constraint.Parse(stringValue, parameterName);
+                        if (parameterTypeInfo.Constraint is UrlValueConstraint constraint)
+                        {
+                            var stringValue = parametersReader.GetString();
+                            parameterValue = constraint.Parse(stringValue, parameterName);
+                        }
+                        else
+                        {
+                            throw new InvalidOperationException($"Cannot accept a string value for parameter '{parameterName}' of complex type '{parameterTypeInfo.Type}'. Complex-typed parameters must be set as properties, not HTML attributes.");
+                        }
                     }
                     else
                     {
-                        // It's a non-string value or a non-coercible destination, so use regular JSON parsing.
-                        parameterValue = JsonSerializer.Deserialize(
-                            ref parametersReader,
-                            parameterTypeInfo.Type,
-                            _jsonOptions);
+                        // It's a non-string value, so use regular JSON parsing
+                        parameterValue = JsonSerializer.Deserialize(ref parametersReader, parameterTypeInfo.Type, _jsonOptions);
                     }
                 }
                 else

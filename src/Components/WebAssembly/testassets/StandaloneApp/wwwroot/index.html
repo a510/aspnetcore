@@ -20,7 +20,85 @@
 
     <script src="_framework/blazor.webassembly.js" autostart="false"></script>
     <script>
-        (function(){
+        (function () {
+            class BlazorCustomElement extends HTMLElement {
+                constructor(parameterMappings) {
+                    super();
+
+                    this._parameterMappings = parameterMappings;
+                    this._parameterValues = {};
+
+                    // Defer until end of execution cycle to be sure the .NET heap is unlocked
+                    this._addRootComponentPromise = Promise.resolve().then(() => {
+                        this._hasPendingSetParameters = false;
+                        return Blazor.rootComponents.add(this, this.localName, this._parameterValues);
+                    });
+
+                    // The promise above will set parameters when it calls 'add'
+                    this._hasPendingSetParameters = true;
+
+                    // TODO: Register JS properties with setters that trigger updates
+                }
+
+                connectedCallback() {
+                    if (this._isDisposed) {
+                        throw new Error(`Cannot connect component ${this.localName} to the document after it has been disposed.`);
+                    }
+
+                    clearTimeout(this._disposalTimeout);
+                }
+
+                disconnectedCallback() {
+                    this._disposalTimeout = setTimeout(async () => {
+                        this._isDisposed = true;
+                        const rootComponent = await this._addRootComponentPromise;
+                        rootComponent.dispose();
+                    }, 1000);
+                }
+
+                attributeChangedCallback(name, oldValue, newValue) {
+                    const mapping = this._parameterMappings[name];
+                    if (mapping) {
+                        this._parameterValues[mapping] = newValue;
+                        this._supplyUpdatedParameters();
+                    }
+                }
+
+                async _supplyUpdatedParameters() {
+                    if (!this._hasPendingSetParameters) {
+                        this._hasPendingSetParameters = true;
+
+                        // Continuation from here will always be async, so at the earliest it will be at
+                        // the end of the current JS execution cycle
+                        const rootComponent = await this._addRootComponentPromise;
+                        if (!this._isDisposed) {
+                            const setParametersPromise = rootComponent.setParameters(this._parameterValues);
+                            this._hasPendingSetParameters = false; // We just snapshotted _parameterValues, so we need to start allowing new calls in case it changes further
+                            await setParametersPromise;
+                        }
+                    }
+                }
+            }
+
+            Blazor._internal.registerCustomElement = function (name, parameters) {
+                // TODO: Put some logic like this into the host code so that the parameter mappings
+                // are communicated internally, not via constructor params.
+                const parameterMappings = {};
+                parameters.forEach(name => {
+                    const dasherizedName = name.replace(/[A-Z]/g, (char, index) =>
+                        (index ? '-' : '') + char.toLowerCase());
+                    parameterMappings[dasherizedName] = name;
+                });
+
+                customElements.define(name, class MyCustomElement extends BlazorCustomElement {
+                    static get observedAttributes() { return Object.keys(parameterMappings); }
+
+                    constructor() {
+                        super(parameterMappings);
+                    }
+                });
+            };
+
             Blazor.start().then(function () {
                 window['__aspnetcore__testing__blazor_wasm__started__'] = true;
             });
