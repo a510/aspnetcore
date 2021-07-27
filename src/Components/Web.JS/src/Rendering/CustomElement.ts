@@ -30,6 +30,8 @@ export class CustomElement extends HTMLElement {
     private _isDisposed = false;
     private _disposalTimeoutHandle: any;
 
+    public renderIntoElement: Element = this;
+
     // Subclasses will need to call this if they want to retain the built-in behavior for knowing which
     // attribute names to observe, since they have to return it from a static function
     static getObservedAttributes(elementName: string): string[] {
@@ -50,7 +52,7 @@ export class CustomElement extends HTMLElement {
             this._hasPendingSetParameters = false;
 
             // This is the same as calling Blazor.rootComponents.add(...)
-            return RootComponentsFunctions.add(this, this.localName, this._parameterValues);
+            return RootComponentsFunctions.add(this.renderIntoElement, this.localName, this._parameterValues);
         });
 
         // Also allow assignment of parameters via properties. This is the only way to set complex-typed values.
