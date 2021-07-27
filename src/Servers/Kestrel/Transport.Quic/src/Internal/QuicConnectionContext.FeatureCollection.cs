@@ -13,6 +13,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
     {
         public long Error { get; set; }
 
+        // Support accessing client certificate
+        // https://github.com/dotnet/aspnetcore/issues/34756
         public X509Certificate2? ClientCertificate
         {
             get => throw new NotSupportedException();
