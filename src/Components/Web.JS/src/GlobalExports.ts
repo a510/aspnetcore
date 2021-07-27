@@ -10,8 +10,9 @@ import { CircuitStartOptions } from './Platform/Circuits/CircuitStartOptions';
 import { WebAssemblyStartOptions } from './Platform/WebAssemblyStartOptions';
 import { Platform, Pointer, System_String, System_Array, System_Object, System_Boolean, System_Byte, System_Int } from './Platform/Platform';
 import { getNextChunk } from './StreamingInterop';
-import { RootComponentsFunctions, enableJSRootComponents, CustomElementConfiguration } from './Rendering/JSRootComponents';
+import { RootComponentsFunctions, enableJSRootComponents, CustomElementConfigByInitializer } from './Rendering/JSRootComponents';
 import { DotNet } from '@microsoft/dotnet-js-interop';
+import { CustomElement, defaultRegisterCustomElement, RegisterCustomElementCallback } from './Rendering/CustomElement';
 
 interface IBlazor {
   navigateTo: (uri: string, options: NavigationOptions) => void;
@@ -23,6 +24,7 @@ interface IBlazor {
   start?: ((userOptions?: Partial<CircuitStartOptions>) => Promise<void>) | ((options?: Partial<WebAssemblyStartOptions>) => Promise<void>);
   platform?: Platform;
   rootComponents: typeof RootComponentsFunctions;
+  CustomElement: typeof CustomElement,
 
   _internal: {
     navigationManager: typeof navigationManagerInternalFunctions | any,
@@ -56,7 +58,8 @@ interface IBlazor {
     getSatelliteAssemblies?: any,
     sendJSDataStream?: (data: any, streamId: number, chunkSize: number) => void,
     getJSDataStreamChunk?: (data: any, position: number, chunkSize: number) => Promise<Uint8Array>,
-    enableJSRootComponents?: (manager: DotNet.DotNetObject, customElements: CustomElementConfiguration) => void,
+    enableJSRootComponents?: (manager: DotNet.DotNetObject, customElements: CustomElementConfigByInitializer) => void,
+    registerCustomElement?: RegisterCustomElementCallback,
 
     // APIs invoked by hot reload
     applyHotReload?: (id: string, metadataDelta: string, ilDelta: string) => void,
@@ -68,6 +71,7 @@ export const Blazor: IBlazor = {
   navigateTo,
   registerCustomEventType,
   rootComponents: RootComponentsFunctions,
+  CustomElement,
 
   _internal: {
     navigationManager: navigationManagerInternalFunctions,
@@ -77,6 +81,7 @@ export const Blazor: IBlazor = {
     InputFile,
     getJSDataStreamChunk: getNextChunk,
     enableJSRootComponents,
+    registerCustomElement: defaultRegisterCustomElement,
   },
 };
 

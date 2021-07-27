@@ -1,4 +1,5 @@
 import { DotNet } from '@microsoft/dotnet-js-interop';
+import { attributeMappingsByElementName, RegisterCustomElementCallback } from './CustomElement';
 
 const pendingRootComponentContainerNamePrefix = '__bl-dynamic-root:';
 const pendingRootComponentContainers = new Map<string, Element>();
@@ -11,7 +12,7 @@ let manager: DotNet.DotNetObject | undefined;
 
 // These are the public APIs at Blazor.rootComponents.*
 export const RootComponentsFunctions = {
-    async add(toElement: Element, componentIdentifier: FunctionStringCallback, initialParameters: ComponentParameters): Promise<DynamicRootComponent> {
+    async add(toElement: Element, componentIdentifier: string, initialParameters: ComponentParameters): Promise<DynamicRootComponent> {
         if (!initialParameters) {
             throw new Error('initialParameters must be an object, even if empty.');
         }
@@ -65,7 +66,7 @@ class DynamicRootComponent {
 }
 
 // Called by the framework
-export function enableJSRootComponents(managerInstance: DotNet.DotNetObject, customElementConfig: CustomElementConfiguration) {
+export function enableJSRootComponents(managerInstance: DotNet.DotNetObject, customElementConfig: CustomElementConfigByInitializer) {
     if (manager) {
         // This will only happen in very nonstandard cases where someone has multiple hosts.
         // It's up to the developer to ensure that only one of them enables dynamic root components.
@@ -74,10 +75,20 @@ export function enableJSRootComponents(managerInstance: DotNet.DotNetObject, cus
 
     manager = managerInstance;
 
-    for (const [initializerIdentifier, customElements] of Object.entries(customElementConfig)) {
-        const initializerFunc = DotNet.jsCallDispatcher.findJSFunction(initializerIdentifier, 0);
-        customElements.forEach(customElement => {
-            initializerFunc(customElement.name, customElement.parameters.map(parameter => ({ name: parameter })));
+    // Call the initializers for each registered custom element
+    for (const [initializerIdentifier, customElementConfigs] of Object.entries(customElementConfig)) {
+        const initializerFunc = DotNet.jsCallDispatcher.findJSFunction(initializerIdentifier, 0) as RegisterCustomElementCallback;
+        customElementConfigs.forEach(customElementConfig => {
+            // Set up the static attribute mapping info so that the CustomElement class can get it
+            // without having to pass through the info from subclasses. Makes it easier to subclass.
+            attributeMappingsByElementName[customElementConfig.name] = {};
+            const attributeMapping = attributeMappingsByElementName[customElementConfig.name];
+            customElementConfig.parameters.forEach(parameterName => {
+                const attributeName = parameterName.replace(/[A-Z]/g, (char, index) => (index ? '-' : '') + char.toLowerCase());
+                attributeMapping[attributeName] = { name: parameterName };
+            });
+
+            initializerFunc(customElementConfig.name, Object.values(attributeMapping));
         });
     }
 }
@@ -91,8 +102,9 @@ function getRequiredManager(): DotNet.DotNetObject {
 }
 
 // Keep in sync with equivalent in JSComponentConfigurationStore.cs
-export type CustomElementConfiguration = { [jsInitializer: string]: CustomElement[] };
-interface CustomElement {
+// These are an internal implementation detail not exposed in the registration APIs.
+export type CustomElementConfigByInitializer = { [jsInitializer: string]: CustomElementConfig[] };
+interface CustomElementConfig {
     name: string;
     parameters: string[];
 }
