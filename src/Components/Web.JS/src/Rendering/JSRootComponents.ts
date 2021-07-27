@@ -1,5 +1,5 @@
 import { DotNet } from '@microsoft/dotnet-js-interop';
-import { attributeMappingsByElementName, RegisterCustomElementCallback } from './CustomElement';
+import { RegisterCustomElementCallback } from './CustomElement';
 
 const pendingRootComponentContainerNamePrefix = '__bl-dynamic-root:';
 const pendingRootComponentContainers = new Map<string, Element>();
@@ -79,16 +79,10 @@ export function enableJSRootComponents(managerInstance: DotNet.DotNetObject, cus
     for (const [initializerIdentifier, customElementConfigs] of Object.entries(customElementConfig)) {
         const initializerFunc = DotNet.jsCallDispatcher.findJSFunction(initializerIdentifier, 0) as RegisterCustomElementCallback;
         customElementConfigs.forEach(customElementConfig => {
-            // Set up the static attribute mapping info so that the CustomElement class can get it
-            // without having to pass through the info from subclasses. Makes it easier to subclass.
-            attributeMappingsByElementName[customElementConfig.name] = {};
-            const attributeMapping = attributeMappingsByElementName[customElementConfig.name];
-            customElementConfig.parameters.forEach(parameterName => {
-                const attributeName = parameterName.replace(/[A-Z]/g, (char, index) => (index ? '-' : '') + char.toLowerCase());
-                attributeMapping[attributeName] = { name: parameterName };
-            });
-
-            initializerFunc(customElementConfig.name, Object.values(attributeMapping));
+            const parameterInfos = customElementConfig.parameters.map(p => ({
+                name: p
+            }));
+            initializerFunc(customElementConfig.name, parameterInfos);
         });
     }
 }

@@ -1,9 +1,4 @@
-import { RootComponentsFunctions } from "./JSRootComponents";
-
-// We track the attribute->parameter mappings internally so that the CustomElement class knows what
-// parameters are on each custom element without having to pass that info from subclasses.
-type CustomElementAttributeMapping = { [attributeName: string]: CustomElementParameterInfo };
-export const attributeMappingsByElementName: { [customElementName: string]: CustomElementAttributeMapping } = {};
+import { RootComponentsFunctions } from './JSRootComponents';
 
 // Defines the signature of a custom element initializer callback. The built-in default initializer
 // uses the built-in CustomElement class.
@@ -18,12 +13,18 @@ interface CustomElementParameterInfo {
 export function defaultRegisterCustomElement(elementName: string, parameters: CustomElementParameterInfo[]): void {
     // Default logic for registering a custom element is just to use the Blazor.CustomElement class
     customElements.define(elementName, class ConfiguredCustomElement extends CustomElement {
-        static get observedAttributes() { return CustomElement.getObservedAttributes(elementName); }
+        static get observedAttributes() {
+            return CustomElement.getObservedAttributes(parameters);
+        }
+
+        constructor() {
+            super(parameters);
+        }
     });
 }
 
 export class CustomElement extends HTMLElement {
-    private _attributeMappings: CustomElementAttributeMapping;
+    private _attributeMappings: { [attributeName: string]: CustomElementParameterInfo };
     private _parameterValues: { [dotNetName: string]: any } = {};
     private _addRootComponentPromise: Promise<any>;
     private _hasPendingSetParameters = true; // The constructor will call setParameters, so it starts true
@@ -34,17 +35,19 @@ export class CustomElement extends HTMLElement {
 
     // Subclasses will need to call this if they want to retain the built-in behavior for knowing which
     // attribute names to observe, since they have to return it from a static function
-    static getObservedAttributes(elementName: string): string[] {
-        return Object.keys(attributeMappingsByElementName[elementName]);
+    static getObservedAttributes(parameters: CustomElementParameterInfo[]): string[] {
+        return parameters.map(p => dasherize(p.name));
     }
 
-    constructor() {
+    constructor(parameters: CustomElementParameterInfo[]) {
         super();
 
-        this._attributeMappings = attributeMappingsByElementName[this.localName];
-        if (!this._attributeMappings) {
-            throw new Error(`The tag name ${this.localName} was not registered as a custom element.`);
-        }
+        // Keep track of how we'll map the attributes to parameters
+        this._attributeMappings = {};
+        parameters.forEach(parameter => {
+            const attributeName = dasherize(parameter.name);
+            this._attributeMappings[attributeName] = parameter;
+        });
 
         // Defer until end of execution cycle so that (1) we know the heap is unlocked, and (2) the initial parameter
         // values will be populated from the initial attributes before we send them to .NET
@@ -58,8 +61,7 @@ export class CustomElement extends HTMLElement {
         // Also allow assignment of parameters via properties. This is the only way to set complex-typed values.
         for (const [attributeName, parameterInfo] of Object.entries(this._attributeMappings)) {
             const dotNetName = parameterInfo.name;
-            const camelCaseName = dotNetName[0].toLowerCase() + dotNetName.substr(1);
-            Object.defineProperty(this, camelCaseName, {
+            Object.defineProperty(this, camelCase(dotNetName), {
                 get: () => this._parameterValues[dotNetName],
                 set: newValue => {
                     if (this.hasAttribute(attributeName)) {
@@ -113,4 +115,12 @@ export class CustomElement extends HTMLElement {
             }
         }
     }
+}
+
+function dasherize(value: string): string {
+    return camelCase(value).replace(/([A-Z])/g, "-$1").toLowerCase();
+}
+
+function camelCase(value: string): string {
+    return value[0].toLowerCase() + value.substr(1);
 }
