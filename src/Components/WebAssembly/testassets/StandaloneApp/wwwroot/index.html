@@ -28,7 +28,8 @@
                     this._parameterMappings = parameterMappings;
                     this._parameterValues = {};
 
-                    // Defer until end of execution cycle to be sure the .NET heap is unlocked
+                    // Defer until end of execution cycle so that (1) we know the heap is unlocked, and (2) the initial parameter
+                    // values will be populated from the initial attributes before we send them to .NET
                     this._addRootComponentPromise = Promise.resolve().then(() => {
                         this._hasPendingSetParameters = false;
                         return Blazor.rootComponents.add(this, this.localName, this._parameterValues);
@@ -37,7 +38,23 @@
                     // The promise above will set parameters when it calls 'add'
                     this._hasPendingSetParameters = true;
 
-                    // TODO: Register JS properties with setters that trigger updates
+                    // Also allow assignment of parameters via properties. This is the only way to set complex-typed values.
+                    for (const [attributeName, dotNetName] of Object.entries(parameterMappings)) {
+                        const camelCaseName = dotNetName[0].toLowerCase() + dotNetName.substr(1);
+                        Object.defineProperty(this, camelCaseName, {
+                            get: () => this._parameterValues[dotNetName],
+                            set: newValue => {
+                                if (this.hasAttribute(attributeName)) {
+                                    // It's nice to keep the DOM in sync with the properties. This set a string representation
+                                    // of the value, but this will get overwritten with the original typed value before we send it to .NET
+                                    this.setAttribute(attributeName, newValue);
+                                }
+
+                                this._parameterValues[dotNetName] = newValue;
+                                this._supplyUpdatedParameters();
+                            }
+                        });
+                    }
                 }
 
                 connectedCallback() {
@@ -57,9 +74,9 @@
                 }
 
                 attributeChangedCallback(name, oldValue, newValue) {
-                    const mapping = this._parameterMappings[name];
-                    if (mapping) {
-                        this._parameterValues[mapping] = newValue;
+                    const dotNetName = this._parameterMappings[name];
+                    if (dotNetName) {
+                        this._parameterValues[dotNetName] = newValue;
                         this._supplyUpdatedParameters();
                     }
                 }
