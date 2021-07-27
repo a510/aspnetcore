@@ -77,7 +77,7 @@ export function enableJSRootComponents(managerInstance: DotNet.DotNetObject, cus
     for (const [initializerIdentifier, customElements] of Object.entries(customElementConfig)) {
         const initializerFunc = DotNet.jsCallDispatcher.findJSFunction(initializerIdentifier, 0);
         customElements.forEach(customElement => {
-            initializerFunc(customElement.name, customElement.parameters);
+            initializerFunc(customElement.name, customElement.parameters.map(parameter => ({ name: parameter })));
         });
     }
 }

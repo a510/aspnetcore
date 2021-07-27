@@ -39,55 +39,19 @@ namespace Microsoft.AspNetCore.Components.Web
                 CustomElementsByInitializer.Add(initializer, customElements);
             }
 
-            var parameters = JSComponentInterop.GetComponentParameters(componentType).ParameterTypes;
-            var parameterInfoForJs = new CustomElementParameter[parameters.Count];
-            var index = 0;
-            foreach (var (name, type) in parameters)
-            {
-                parameterInfoForJs[index++] = new CustomElementParameter(name, type);
-            }
+            var parameters = JSComponentInterop.GetComponentParameters(componentType).ParameterTypes.Keys.ToArray();
 
             customElements.Add(new CustomElement
             {
                 Name = customElementName,
-                Parameters = parameterInfoForJs,
+                Parameters = parameters,
             });
         }
 
-        internal readonly struct CustomElement
+        internal struct CustomElement
         {
-            public readonly string Name { get; init; }
-            public readonly CustomElementParameter[] Parameters { get; init; }
-        }
-
-        internal readonly struct CustomElementParameter
-        {
-            public string Name { get; }
-            public string Type { get; }
-
-            public CustomElementParameter(string name, Type type)
-            {
-                Name = name;
-                Type = GetJSType(type);
-            }
-
-            private static string GetJSType(Type type) => type switch
-            {
-                var x when x == typeof(string) => "string",
-                var x when x == typeof(bool) => "boolean",
-                var x when x == typeof(bool?) => "boolean?",
-                var x when x == typeof(decimal) => "number",
-                var x when x == typeof(decimal?) => "number?",
-                var x when x == typeof(double) => "number",
-                var x when x == typeof(double?) => "number?",
-                var x when x == typeof(float) => "number",
-                var x when x == typeof(float?) => "number?",
-                var x when x == typeof(int) => "number",
-                var x when x == typeof(int?) => "number?",
-                var x when x == typeof(long) => "number",
-                var x when x == typeof(long?) => "number?",
-                _ => "object"
-            };
+            public string Name { get; init; }
+            public string[] Parameters { get; init; }
         }
     }
 }
