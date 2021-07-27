@@ -7,9 +7,48 @@ using Microsoft.AspNetCore.Connections.Features;
 
 namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
 {
-    internal sealed partial class QuicStreamContext : IPersistentStateFeature
+    internal sealed partial class QuicStreamContext : IPersistentStateFeature, IStreamDirectionFeature, IProtocolErrorCodeFeature, IStreamIdFeature, IStreamAbortFeature
     {
         private IDictionary<object, object?>? _persistentState;
+
+        public bool CanRead { get; private set; }
+        public bool CanWrite { get; private set; }
+
+        public long Error { get; set; }
+
+        public long StreamId { get; private set; }
+
+        public void AbortRead(long errorCode, ConnectionAbortedException abortReason)
+        {
+            lock (_shutdownLock)
+            {
+                if (_stream.CanRead)
+                {
+                    _log.StreamAbortRead(this, abortReason.Message);
+                    _stream.AbortRead(errorCode);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Unable to abort reading from a stream that doesn't support reading.");
+                }
+            }
+        }
+
+        public void AbortWrite(long errorCode, ConnectionAbortedException abortReason)
+        {
+            lock (_shutdownLock)
+            {
+                if (_stream.CanWrite)
+                {
+                    _log.StreamAbortWrite(this, abortReason.Message);
+                    _stream.AbortWrite(errorCode);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Unable to abort writing to a stream that doesn't support writing.");
+                }
+            }
+        }
 
         IDictionary<object, object?> IPersistentStateFeature.State
         {
@@ -23,6 +62,11 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
         private void InitializeFeatures()
         {
             _currentIPersistentStateFeature = this;
+            _currentIStreamDirectionFeature = this;
+            _currentIProtocolErrorCodeFeature = this;
+            _currentIStreamIdFeature = this;
+            _currentIStreamAbortFeature = this;
+            _currentITlsConnectionFeature = _connection._currentITlsConnectionFeature;
         }
     }
 }
