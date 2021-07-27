@@ -404,32 +404,33 @@ namespace Microsoft.AspNetCore.Testing
         }
     }
 
-    internal class Http3StreamBase : IProtocolErrorCodeFeature
+    internal class Http3StreamBase
     {
         internal TaskCompletionSource _onStreamCreatedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource _onStreamCompletedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource _onHeaderReceivedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        internal ConnectionContext StreamContext { get; }
-        internal IProtocolErrorCodeFeature _protocolErrorCodeFeature;
+        internal TestStreamContext StreamContext { get; }
         internal DuplexPipe.DuplexPipePair _pair;
         internal Http3InMemory _testBase;
         internal Http3Connection _connection;
         public long BytesReceived { get; private set; }
         public long Error
         {
-            get => _protocolErrorCodeFeature.Error;
-            set => _protocolErrorCodeFeature.Error = value;
+            get => StreamContext.Error;
+            set => StreamContext.Error = value;
         }
 
         public Task OnStreamCreatedTask => _onStreamCreatedTcs.Task;
         public Task OnStreamCompletedTask => _onStreamCompletedTcs.Task;
         public Task OnHeaderReceivedTask => _onHeaderReceivedTcs.Task;
 
+        public ConnectionAbortedException AbortReadException => StreamContext.AbortReadException;
+        public ConnectionAbortedException AbortWriteException => StreamContext.AbortWriteException;
+
         public Http3StreamBase(TestStreamContext testStreamContext)
         {
             StreamContext = testStreamContext;
-            _protocolErrorCodeFeature = testStreamContext;
             _pair = testStreamContext._pair;
         }
 
@@ -938,7 +939,7 @@ namespace Microsoft.AspNetCore.Testing
         }
     }
 
-    internal class TestStreamContext : ConnectionContext, IStreamDirectionFeature, IStreamIdFeature, IProtocolErrorCodeFeature, IPersistentStateFeature
+    internal class TestStreamContext : ConnectionContext, IStreamDirectionFeature, IStreamIdFeature, IProtocolErrorCodeFeature, IPersistentStateFeature, IStreamAbortFeature
     {
         private readonly Http3InMemory _testBase;
 
@@ -999,16 +1000,22 @@ namespace Microsoft.AspNetCore.Testing
 
             Features.Set<IStreamDirectionFeature>(this);
             Features.Set<IStreamIdFeature>(this);
+            Features.Set<IStreamAbortFeature>(this);
             Features.Set<IProtocolErrorCodeFeature>(this);
             Features.Set<IPersistentStateFeature>(this);
 
             StreamId = streamId;
             _testBase.Logger.LogInformation($"Initializing stream {streamId}");
             ConnectionId = "TEST:" + streamId.ToString();
+            AbortReadException = null;
+            AbortWriteException = null;
 
             _disposedTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             Disposed = false;
         }
+
+        public ConnectionAbortedException AbortReadException { get; private set; }
+        public ConnectionAbortedException AbortWriteException { get; private set; }
 
         public bool Disposed { get; private set; }
 
@@ -1075,6 +1082,16 @@ namespace Microsoft.AspNetCore.Testing
                 // Lazily allocate persistent state
                 return _persistentState ?? (_persistentState = new ConnectionItems());
             }
+        }
+
+        void IStreamAbortFeature.AbortRead(long errorCode, ConnectionAbortedException abortReason)
+        {
+            AbortReadException = abortReason;
+        }
+
+        void IStreamAbortFeature.AbortWrite(long errorCode, ConnectionAbortedException abortReason)
+        {
+            AbortWriteException = abortReason;
         }
     }
 }

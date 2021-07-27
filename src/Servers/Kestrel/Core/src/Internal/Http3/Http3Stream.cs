@@ -59,7 +59,6 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
 
         public bool EndStreamReceived => (_completionState & StreamCompletionFlags.EndStreamReceived) == StreamCompletionFlags.EndStreamReceived;
         private bool IsAborted => (_completionState & StreamCompletionFlags.Aborted) == StreamCompletionFlags.Aborted;
-        internal bool RstStreamReceived => (_completionState & StreamCompletionFlags.RstStreamReceived) == StreamCompletionFlags.RstStreamReceived;
 
         public Pipe RequestBodyPipe { get; private set; } = default!;
 
@@ -372,7 +371,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
                     Log.RequestBodyNotEntirelyRead(ConnectionIdFeature, TraceIdentifier);
                 }
 
-                var (oldState, newState) = ApplyCompletionFlag(StreamCompletionFlags.Aborted);
+                var (oldState, newState) = ApplyCompletionFlag(StreamCompletionFlags.AbortedRead);
                 if (oldState != newState)
                 {
                     // https://quicwg.org/base-drafts/draft-ietf-quic-http.html#section-4.1-15
@@ -380,8 +379,7 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
                     // the request stream, send a complete response, and cleanly close the sending part of the stream.
                     // The error code H3_NO_ERROR SHOULD be used when requesting that the client stop sending on the
                     // request stream.
-                    _errorCodeFeature.Error = (long)Http3ErrorCode.NoError;
-                    _streamAbortFeature.AbortRead(new ConnectionAbortedException("The application completed without reading the entire request body."));
+                    _streamAbortFeature.AbortRead((long)Http3ErrorCode.NoError, new ConnectionAbortedException("The application completed without reading the entire request body."));
                     RequestBodyPipe.Writer.Complete();
                 }
 
@@ -941,8 +939,8 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Http3
         private enum StreamCompletionFlags
         {
             None = 0,
-            RstStreamReceived = 1,
-            EndStreamReceived = 2,
+            EndStreamReceived = 1,
+            AbortedRead = 2,
             Aborted = 4,
         }
 

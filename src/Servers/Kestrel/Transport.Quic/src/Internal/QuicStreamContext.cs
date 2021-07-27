@@ -399,14 +399,14 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
             Output.CancelPendingRead();
         }
 
-        public void AbortRead(ConnectionAbortedException abortReason)
+        public void AbortRead(long errorCode, ConnectionAbortedException abortReason)
         {
             lock (_shutdownLock)
             {
                 if (_stream.CanRead)
                 {
                     _log.StreamAbortRead(this, abortReason.Message);
-                    _stream.AbortRead(Error);
+                    _stream.AbortRead(errorCode);
                 }
                 else
                 {
@@ -415,14 +415,14 @@ namespace Microsoft.AspNetCore.Server.Kestrel.Transport.Quic.Internal
             }
         }
 
-        public void AbortWrite(ConnectionAbortedException abortReason)
+        public void AbortWrite(long errorCode, ConnectionAbortedException abortReason)
         {
             lock (_shutdownLock)
             {
                 if (_stream.CanWrite)
                 {
                     _log.StreamAbortWrite(this, abortReason.Message);
-                    _stream.AbortWrite(Error);
+                    _stream.AbortWrite(errorCode);
                 }
                 else
                 {
